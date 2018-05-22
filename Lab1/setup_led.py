@@ -37,7 +37,7 @@ def setoffPin(ledPin):
 def main():
     
     # Create ON and OFF array \
-    # to differetiate the PINs by True or False in argv
+    # to differentiate the PINs by True or False in argv
     ON = []
     OFF = []
     for s in sys.argv[1:]:

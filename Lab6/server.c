@@ -14,6 +14,7 @@ int main(void) {
     UA_ServerConfig *config = UA_ServerConfig_new_default();
     UA_Server *server = UA_Server_new(config);
 
+    /* Lab6 : show time and student ID */
     UA_DateTime ServerTime;
     UA_String StudentID;
 
