@@ -13,7 +13,7 @@ Notice that you have to install Adafruit_DHT module first with bellow:
 @argv[1]: BCM pin id
 @argv[2]: Trigger condition
 @argv[3]: monitor time
-@argv[4]: monitor delay
+@argv[4]: command
 """
 import subprocess
 import time
