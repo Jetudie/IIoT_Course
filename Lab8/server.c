@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include <signal.h>
-#include <time.h>
+#include <unistd.h>
 #include "open62541.h"
 
 static UA_Double hum = 0;
@@ -226,10 +226,10 @@ getMethodCallback(UA_Server *server,
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "Get method was called");
 
     /* call monitorDHT.py use BCM pin 26 and set time to 1 sec */
-    char str[30] = "python3 monitorDHT.py 26 1";
+    char str[30] = "python3 monitorDHT.py 26 2";
     printf("%s\n", str);
     system(str);
-    sleep(2);
+    //sleep(1);
 
     /* read log.txt file writes by monitorDHT.py */
     FILE *file = fopen("log.txt", "r");
@@ -239,7 +239,7 @@ getMethodCallback(UA_Server *server,
 
     /* set hum and temp according to log.txt */
     fscanf(file, "%lf\t%lf", &hum, &temp);
-    printf("%lf and %lf", temp, hum);
+    printf("%.2lf and %.2lf\n", temp, hum);
     fclose(file);
 
     /* write hum and temp variable */
