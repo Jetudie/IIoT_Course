@@ -1,22 +1,81 @@
 #include <stdio.h>
 #include <signal.h>
 #include <unistd.h>
+#include <pthread.h>
 #include "open62541.h"
 
-//static UA_Double hum = 0;
-static UA_Double temp = 0;
-static UA_Int32 position = 0;
+static UA_Int32 Red = 0;
+static UA_Int32 Green = 0;
+static UA_Int32 Blue = 0;
 
-static void writeLEDVariable(UA_Server *server, bool onoff) {
+UA_Boolean running = true;
+UA_Boolean threading = 0;
+pthread_mutex_t mutex1 = PTHREAD_MUTEX_INITIALIZER;
+pthread_t t;
+
+static void stopHandler(int);
+static void *runDetection(void*);
+static void writeStatusVariable(UA_Server*, int);
+static void writeRGBVariable(UA_Server*, int);
+static UA_StatusCode switchMethodCallback(UA_Server*,const UA_NodeId*, void*, const UA_NodeId*,
+	      			   	  void *,const UA_NodeId*, void*, size_t, const UA_Variant*,
+					  size_t, UA_Variant*);
+static void addSwitchMethod(UA_Server*, UA_NodeId);
+static void addARMObject(UA_Server*, char*);
+
+
+static void stopHandler(int sign) {
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "received ctrl-c");
+    running = false;
+}
+
+static void *runDetection(void *server){    
+    char* str = "thread ends";
+
+    pthread_mutex_lock( &mutex1 ); 
+
+    if(threading){
+	    pthread_exit((void*) str);
+	    return 0;
+    }
+
+    threading = 1;
+    pthread_mutex_unlock( &mutex1 ); 
+
+    int i = 0;
+    UA_Server *s1 = (UA_Server*) server;
+
+    sleep(3);
+
+    while(running && threading){
+	    printf("Detecting... (%d)\n", ++i);
+	    writeStatusVariable(s1, 1); 
+	    sleep(3);
+	    printf("Detecting... (%d)\n", ++i);
+	    //system("python3 watch.py");
+	    writeRGBVariable(s1, 2);
+	    sleep(3);
+    }
+
+    pthread_mutex_lock( &mutex1 ); 
+    threading = 0;
+    pthread_mutex_unlock( &mutex1 ); 
+
+    pthread_exit((void*) str);
+}
+
+static void writeStatusVariable(UA_Server *server, int status) {
     UA_NodeId myIntegerNodeId = UA_NODEID_STRING(1, "status");
 
     /* Determine myString */
     UA_String myString;
-    if(onoff)
-        myString = UA_STRING("on");
-    else 
-        myString = UA_STRING("off");
-
+    if(status == 1)
+        myString = UA_STRING("Grasping");
+    else if(status == 2)
+        myString = UA_STRING("Waiting");
+    else
+        myString = UA_STRING("Off");
+	
     /* Write status variable */
     UA_Variant myVar;
     UA_Variant_init(&myVar);
@@ -43,157 +102,33 @@ static void writeLEDVariable(UA_Server *server, bool onoff) {
     UA_Server_write(server, &wv);
 }
 
-static UA_StatusCode
-turnonMethodCallback(UA_Server *server,
-                         const UA_NodeId *sessionId, void *sessionHandle,
-                         const UA_NodeId *methodId, void *methodContext,
-                         const UA_NodeId *objectId, void *objectContext,
-                         size_t inputSize, const UA_Variant *input,
-                         size_t outputSize, UA_Variant *output) {
-
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "Turn on was called");
-
-    /* Call led.py with argument 1 to turn LED on */    
-    char str[20] = "python3 led.py 1";
-    printf("%s\n", str);
-    system(str);
-    
-    /* Set status to "on" */
-    writeLEDVariable(server, true); 
-
-    return UA_STATUSCODE_GOOD;
-}
-
-static UA_StatusCode
-turnoffMethodCallback(UA_Server *server,
-                         const UA_NodeId *sessionId, void *sessionHandle,
-                         const UA_NodeId *methodId, void *methodContext,
-                         const UA_NodeId *objectId, void *objectContext,
-                         size_t inputSize, const UA_Variant *input,
-                         size_t outputSize, UA_Variant *output) {
-
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "Turn off was called");
-    
-    /* Call led.py with argument 1 to turn LED on */    
-    char str[20] = "python3 led.py 0";
-    printf("%s\n", str);
-    system(str);
-
-    /* Set status to "off" */
-    writeLEDVariable(server, false); 
-
-    return UA_STATUSCODE_GOOD;
-}
 static void
-addTurnOnMethod(UA_Server *server, UA_NodeId nodeid) {
-    UA_Argument inputArgument;
-    UA_Argument_init(&inputArgument);
-    inputArgument.description = UA_LOCALIZEDTEXT("en-US", "A String(ON)");
-    inputArgument.name = UA_STRING("MyInput(ON)");
-    inputArgument.dataType = UA_TYPES[UA_TYPES_STRING].typeId;
-    inputArgument.valueRank = -1; /* scalar */
-
-    UA_Argument outputArgument;
-    UA_Argument_init(&outputArgument);
-    outputArgument.description = UA_LOCALIZEDTEXT("en-US", "A String(ON)");
-    outputArgument.name = UA_STRING("MyOutput(ON)");
-    outputArgument.dataType = UA_TYPES[UA_TYPES_STRING].typeId;
-    outputArgument.valueRank = -1; /* scalar */
-
-    UA_MethodAttributes helloAttr = UA_MethodAttributes_default;
-    helloAttr.description = UA_LOCALIZEDTEXT("en-US","Turn on LED");
-    helloAttr.displayName = UA_LOCALIZEDTEXT("en-US","turnon method");
-    helloAttr.executable = true;
-    helloAttr.userExecutable = true;
-    UA_NodeId myNodeId = UA_NODEID_STRING(1, "turnon");
-    UA_Server_addMethodNode(server, myNodeId, nodeid,
-                          UA_NODEID_NUMERIC(0, UA_NS0ID_HASORDEREDCOMPONENT),
-                          UA_QUALIFIEDNAME(1, "hello world"),
-                          helloAttr, &turnonMethodCallback,
-                          1, &inputArgument, 1, &outputArgument, NULL, NULL);
-                          //UA_NODEID_NUMERIC(0, UA_NS0ID_OBJECTSFOLDER), UA_NODEID_NUMERIC(1,62541)
-}
-
-static void
-addTurnOffMethod(UA_Server *server, UA_NodeId nodeid ) {
-    UA_Argument inputArgument;
-    UA_Argument_init(&inputArgument);
-    inputArgument.description = UA_LOCALIZEDTEXT("en-US", "A String(OFF)");
-    inputArgument.name = UA_STRING("MyInput(OFF)");
-    inputArgument.dataType = UA_TYPES[UA_TYPES_STRING].typeId;
-    inputArgument.valueRank = -1; /* scalar */
-
-    UA_Argument outputArgument;
-    UA_Argument_init(&outputArgument);
-    outputArgument.description = UA_LOCALIZEDTEXT("en-US", "A String(OFF)");
-    outputArgument.name = UA_STRING("MyOutput(OFF)");
-    outputArgument.dataType = UA_TYPES[UA_TYPES_STRING].typeId;
-    outputArgument.valueRank = -1; /* scalar */
-
-    UA_MethodAttributes helloAttr = UA_MethodAttributes_default;
-    helloAttr.description = UA_LOCALIZEDTEXT("en-US","Turn off LED");
-    helloAttr.displayName = UA_LOCALIZEDTEXT("en-US","turnoff method");
-    helloAttr.executable = true;
-    helloAttr.userExecutable = true;
-    UA_NodeId myNodeId = UA_NODEID_STRING(1, "turnoff");
-    UA_Server_addMethodNode(server, myNodeId, nodeid,
-                          UA_NODEID_NUMERIC(0, UA_NS0ID_HASORDEREDCOMPONENT),
-                          UA_QUALIFIEDNAME(1, "Turn_off"),
-                          helloAttr, &turnoffMethodCallback,
-                          1, &inputArgument, 1, &outputArgument, NULL, NULL);
-}
-
-static void addLEDObject(UA_Server *server, char* objectname){
-	UA_ObjectAttributes oAttr;
-	UA_ObjectAttributes_init(&oAttr);
-	oAttr.displayName = UA_LOCALIZEDTEXT("en-US", objectname);
-	UA_NodeId myObjectNodeId = UA_NODEID_STRING(1, objectname);
-	UA_QualifiedName myObjectName = UA_QUALIFIEDNAME(1, objectname);
-	UA_Server_addObjectNode(server, myObjectNodeId,
-		UA_NODEID_NUMERIC(0, UA_NS0ID_OBJECTSFOLDER),
-		UA_NODEID_NUMERIC(0, UA_NS0ID_ORGANIZES),
-		myObjectName, UA_NODEID_NULL,
-		oAttr, NULL, NULL);
-	
-	/* add variable status */
-	UA_VariableAttributes modelAttr = UA_VariableAttributes_default;	
-	UA_String myString = UA_STRING("off");
-	
-	UA_NodeId statusNodeId = UA_NODEID_STRING(1, "status");
-    	UA_QualifiedName statusName = UA_QUALIFIEDNAME(1, "status");
-        
-    	modelAttr.description = UA_LOCALIZEDTEXT("en-US","status");
-    	modelAttr.displayName = UA_LOCALIZEDTEXT("en-US","status");
-    	modelAttr.dataType = UA_TYPES[UA_TYPES_STRING].typeId;
-	modelAttr.accessLevel = UA_ACCESSLEVELMASK_READ | UA_ACCESSLEVELMASK_WRITE;
-    	
-    	UA_Variant_setScalar(&modelAttr.value, &myString, &UA_TYPES[UA_TYPES_STRING]);
-    	UA_Server_addVariableNode(server, statusNodeId, myObjectNodeId,
-                              UA_NODEID_NUMERIC(0, UA_NS0ID_HASCOMPONENT),
-                              statusName,
-                              UA_NODEID_NUMERIC(0, UA_NS0ID_BASEDATAVARIABLETYPE), modelAttr, NULL, NULL);
-
-	/* add methods */
-	addTurnOnMethod(server, myObjectNodeId);
-	addTurnOffMethod(server, myObjectNodeId);
-}
-
-
-static void
-writeDHTVariable(UA_Server *server, char* nodeid, int x) {
-    UA_NodeId myIntegerNodeId = UA_NODEID_STRING(1, nodeid);
-
+writeRGBVariable(UA_Server *server, int x) {
     /* Write a different value according to current status. 
      * In here only myString is used */
-    UA_Double myDouble;
-    if(x)
-    	myDouble = hum;
-    else
-    	myDouble = temp;
+    UA_NodeId myIntegerNodeId;
+    UA_Int32 myInt;
+    switch(x){
+	case 1:
+	    myIntegerNodeId = UA_NODEID_STRING(1, "red");
+	    myInt = ++Red; 
+	    break;
+	case 2:
+	    myIntegerNodeId = UA_NODEID_STRING(1, "green");
+	    myInt = ++Green; 
+	    break;
+	case 3:
+	    myIntegerNodeId = UA_NODEID_STRING(1, "blue");
+	    myInt = ++Blue; 
+	    break;
+	default:
+	    myIntegerNodeId = UA_NODEID_STRING(1, "red");
+	    myInt = ++Red; 
+    }
 
     UA_Variant myVar;
     UA_Variant_init(&myVar);
-    UA_Variant_setScalar(&myVar, &myDouble, &UA_TYPES[UA_TYPES_DOUBLE]);
+    UA_Variant_setScalar(&myVar, &myInt, &UA_TYPES[UA_TYPES_INT32]);
     UA_Server_writeValue(server, myIntegerNodeId, myVar);
 
     /* Set the status code of the value to an error code. The function
@@ -217,41 +152,34 @@ writeDHTVariable(UA_Server *server, char* nodeid, int x) {
 }
 
 static UA_StatusCode
-getMethodCallback(UA_Server *server,
+switchMethodCallback(UA_Server *server,
                          const UA_NodeId *sessionId, void *sessionHandle,
                          const UA_NodeId *methodId, void *methodContext,
                          const UA_NodeId *objectId, void *objectContext,
                          size_t inputSize, const UA_Variant *input,
                          size_t outputSize, UA_Variant *output) {
 
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "Get method was called");
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "Run method was called");
 
     /* call monitorDHT.py use BCM pin 26 and set time to 1 sec */
-    char str[30] = "python3 monitorDHT.py 26 2";
-    printf("%s\n", str);
-    system(str);
-    //sleep(1);
-
-    /* read log.txt file writes by monitorDHT.py */
-    FILE *file = fopen("log.txt", "r");
-    if(file == NULL){
-        printf("Fail to open file!\n");
+    //char str[30] = "python3 monitorDHT.py 26 2";
+    //printf("%s\n", str);
+    //system(str);
+    pthread_mutex_lock( &mutex1 ); 
+    if(threading){
+	    threading = 0;
     }
+    else
+	    pthread_create(&t, NULL, runDetection, (void*) server);
+	    
 
-    /* set hum and temp according to log.txt */
-    fscanf(file, "%lf\t%lf", &hum, &temp);
-    printf("%.2lf and %.2lf\n", temp, hum);
-    fclose(file);
-
-    /* write hum and temp variable */
-    writeDHTVariable(server, "hum", 1); 
-    writeDHTVariable(server, "temp", 0); 
+    pthread_mutex_unlock( &mutex1 );
 
     return UA_STATUSCODE_GOOD;
 }
 
 static void
-addGetMethod(UA_Server *server, UA_NodeId nodeid) {
+addSwitchMethod(UA_Server *server, UA_NodeId nodeid) {
     UA_Argument inputArgument;
     UA_Argument_init(&inputArgument);
     inputArgument.description = UA_LOCALIZEDTEXT("en-US", "A String");
@@ -267,19 +195,19 @@ addGetMethod(UA_Server *server, UA_NodeId nodeid) {
     outputArgument.valueRank = -1; /* scalar */
 
     UA_MethodAttributes helloAttr = UA_MethodAttributes_default;
-    helloAttr.description = UA_LOCALIZEDTEXT("en-US","get data");
-    helloAttr.displayName = UA_LOCALIZEDTEXT("en-US","get method");
+    helloAttr.description = UA_LOCALIZEDTEXT("en-US","Switch for detection");
+    helloAttr.displayName = UA_LOCALIZEDTEXT("en-US","Switch for detection");
     helloAttr.executable = true;
     helloAttr.userExecutable = true;
-    UA_NodeId myNodeId = UA_NODEID_STRING(1, "getdata");
+    UA_NodeId myNodeId = UA_NODEID_STRING(1, "switch");
     UA_Server_addMethodNode(server, myNodeId, nodeid,
                           UA_NODEID_NUMERIC(0, UA_NS0ID_HASORDEREDCOMPONENT),
-                          UA_QUALIFIEDNAME(1, "getget"),
-                          helloAttr, &getMethodCallback,
+                          UA_QUALIFIEDNAME(1, "switch"),
+                          helloAttr, &switchMethodCallback,
                           1, &inputArgument, 1, &outputArgument, NULL, NULL);
 }
 
-static void addDHTObject(UA_Server *server, char* objectname){
+static void addARMObject(UA_Server *server, char* objectname){
 	UA_ObjectAttributes oAttr;
 	UA_ObjectAttributes_init(&oAttr);
 	oAttr.displayName = UA_LOCALIZEDTEXT("en-US", objectname);
@@ -291,66 +219,95 @@ static void addDHTObject(UA_Server *server, char* objectname){
 		myObjectName, UA_NODEID_NULL,
 		oAttr, NULL, NULL);
 	
-
-	/* add variable temp */
-	UA_VariableAttributes tempAttr = UA_VariableAttributes_default;	
-	UA_Double myTemp = 0;
+	/* add variable red */
+	UA_VariableAttributes redAttr = UA_VariableAttributes_default;	
 	
-	UA_NodeId tempNodeId = UA_NODEID_STRING(1, "temp");
-    UA_QualifiedName tempName = UA_QUALIFIEDNAME(1, "temp");
+	UA_NodeId redNodeId = UA_NODEID_STRING(1, "red");
+        UA_QualifiedName redName = UA_QUALIFIEDNAME(1, "red");
         
-    tempAttr.description = UA_LOCALIZEDTEXT("en-US","temp");
-    tempAttr.displayName = UA_LOCALIZEDTEXT("en-US","temp");
-    tempAttr.dataType = UA_TYPES[UA_TYPES_DOUBLE].typeId;
-	tempAttr.accessLevel = UA_ACCESSLEVELMASK_READ | UA_ACCESSLEVELMASK_WRITE;
+        redAttr.description = UA_LOCALIZEDTEXT("en-US","red");
+        redAttr.displayName = UA_LOCALIZEDTEXT("en-US","red");
+        redAttr.dataType = UA_TYPES[UA_TYPES_INT32].typeId;
+	redAttr.accessLevel = UA_ACCESSLEVELMASK_READ | UA_ACCESSLEVELMASK_WRITE;
     	
-    UA_Variant_setScalar(&tempAttr.value, &myTemp, &UA_TYPES[UA_TYPES_DOUBLE]);
-    UA_Server_addVariableNode(server, tempNodeId, myObjectNodeId,
-                              UA_NODEID_NUMERIC(0, UA_NS0ID_HASCOMPONENT),
-                              tempName,
-                              UA_NODEID_NUMERIC(0, UA_NS0ID_BASEDATAVARIABLETYPE), tempAttr, NULL, NULL);
+        UA_Variant_setScalar(&redAttr.value, &Red, &UA_TYPES[UA_TYPES_INT32]);
+        UA_Server_addVariableNode(server, redNodeId, myObjectNodeId,
+                                  UA_NODEID_NUMERIC(0, UA_NS0ID_HASCOMPONENT),
+                                  redName,
+                                  UA_NODEID_NUMERIC(0, UA_NS0ID_BASEDATAVARIABLETYPE), redAttr, NULL, NULL);
 
-	/* add variable hum */
-	UA_VariableAttributes humAttr = UA_VariableAttributes_default;	
-	UA_Double myHum = 0;
+	/* add variable green */
+	UA_VariableAttributes greenAttr = UA_VariableAttributes_default;	
 	
-	UA_NodeId humNodeId = UA_NODEID_STRING(1, "hum");
-    UA_QualifiedName humName = UA_QUALIFIEDNAME(1, "hum");
+	UA_NodeId greenNodeId = UA_NODEID_STRING(1, "green");
+	UA_QualifiedName greenName = UA_QUALIFIEDNAME(1, "green");
         
-    humAttr.description = UA_LOCALIZEDTEXT("en-US","hum");
-    humAttr.displayName = UA_LOCALIZEDTEXT("en-US","hum");
-    humAttr.dataType = UA_TYPES[UA_TYPES_DOUBLE].typeId;
-	humAttr.accessLevel = UA_ACCESSLEVELMASK_READ | UA_ACCESSLEVELMASK_WRITE;
+       	greenAttr.description = UA_LOCALIZEDTEXT("en-US","green");
+	greenAttr.displayName = UA_LOCALIZEDTEXT("en-US","green");
+	greenAttr.dataType = UA_TYPES[UA_TYPES_INT32].typeId;
+	greenAttr.accessLevel = UA_ACCESSLEVELMASK_READ | UA_ACCESSLEVELMASK_WRITE;
     	
-    	UA_Variant_setScalar(&humAttr.value, &myHum, &UA_TYPES[UA_TYPES_DOUBLE]);
-    	UA_Server_addVariableNode(server, humNodeId, myObjectNodeId,
-                              UA_NODEID_NUMERIC(0, UA_NS0ID_HASCOMPONENT),
-                              humName,
-                              UA_NODEID_NUMERIC(0, UA_NS0ID_BASEDATAVARIABLETYPE), humAttr, NULL, NULL);
+    	UA_Variant_setScalar(&greenAttr.value, &Green, &UA_TYPES[UA_TYPES_INT32]);
+    	UA_Server_addVariableNode(server, greenNodeId, myObjectNodeId,
+                                  UA_NODEID_NUMERIC(0, UA_NS0ID_HASCOMPONENT),
+                                  greenName,
+                                  UA_NODEID_NUMERIC(0, UA_NS0ID_BASEDATAVARIABLETYPE), greenAttr, NULL, NULL);
+
+	/* add variable blue */
+	UA_VariableAttributes blueAttr = UA_VariableAttributes_default;	
+	
+	UA_NodeId blueNodeId = UA_NODEID_STRING(1, "blue");
+	UA_QualifiedName blueName = UA_QUALIFIEDNAME(1, "blue");
+        
+        blueAttr.description = UA_LOCALIZEDTEXT("en-US","blue");
+	blueAttr.displayName = UA_LOCALIZEDTEXT("en-US","blue");
+	blueAttr.dataType = UA_TYPES[UA_TYPES_INT32].typeId;
+	blueAttr.accessLevel = UA_ACCESSLEVELMASK_READ | UA_ACCESSLEVELMASK_WRITE;
+    	
+    	UA_Variant_setScalar(&blueAttr.value, &Blue, &UA_TYPES[UA_TYPES_INT32]);
+    	UA_Server_addVariableNode(server, blueNodeId, myObjectNodeId,
+                                  UA_NODEID_NUMERIC(0, UA_NS0ID_HASCOMPONENT),
+                                  blueName,
+                                  UA_NODEID_NUMERIC(0, UA_NS0ID_BASEDATAVARIABLETYPE), blueAttr, NULL, NULL);
+
+	/* add variable status */
+	UA_VariableAttributes modelAttr = UA_VariableAttributes_default;	
+	UA_String myString = UA_STRING("Waiting");
+	
+	UA_NodeId statusNodeId = UA_NODEID_STRING(1, "status");
+    	UA_QualifiedName statusName = UA_QUALIFIEDNAME(1, "status");
+        
+    	modelAttr.description = UA_LOCALIZEDTEXT("en-US","status");
+    	modelAttr.displayName = UA_LOCALIZEDTEXT("en-US","status");
+    	modelAttr.dataType = UA_TYPES[UA_TYPES_STRING].typeId;
+	modelAttr.accessLevel = UA_ACCESSLEVELMASK_READ | UA_ACCESSLEVELMASK_WRITE;
+    	
+    	UA_Variant_setScalar(&modelAttr.value, &myString, &UA_TYPES[UA_TYPES_STRING]);
+    	UA_Server_addVariableNode(server, statusNodeId, myObjectNodeId,
+                                  UA_NODEID_NUMERIC(0, UA_NS0ID_HASCOMPONENT),
+                                  statusName,
+                                  UA_NODEID_NUMERIC(0, UA_NS0ID_BASEDATAVARIABLETYPE), modelAttr, NULL, NULL);
     /* add method */
-	addGetMethod(server, myObjectNodeId);
+	addSwitchMethod(server, myObjectNodeId);
 }
-
-
-UA_Boolean running = true;
-static void stopHandler(int sign) {
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "received ctrl-c");
-    running = false;
-}
-
 
 int main(void) {
     signal(SIGINT, stopHandler);
     signal(SIGTERM, stopHandler);
 
+    void *ret;
+
     UA_ServerConfig *config = UA_ServerConfig_new_default();
     UA_Server *server = UA_Server_new(config);
 
-    /* Lab8: Add obejcts with methods and variables underneath */
-    addDHTObject(server, "DHT11");
-    addLEDObject(server, "LED");
+    /* Add obejcts with methods and variables underneath */
+    addARMObject(server, "ARM");
 
+    pthread_create(&t, NULL, runDetection, (void*) server);
     UA_StatusCode retval = UA_Server_run(server, &running);
+    pthread_join(t, &ret);
+    char *result = (char*) ret;
+    printf("result = %s", result);
     UA_Server_delete(server);
     UA_ServerConfig_delete(config);
     return (int)retval;
