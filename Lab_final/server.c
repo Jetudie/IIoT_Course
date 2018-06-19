@@ -51,8 +51,7 @@ static void *runDetection(void *server){
 	    printf("Detecting... (%d)\n", ++i);
 	    writeStatusVariable(s1, 1); 
 	    sleep(3);
-	    printf("Detecting... (%d)\n", ++i);
-	    //system("python3 watch.py");
+	    system("python3 try2.py");
 	    writeRGBVariable(s1, 2);
 	    sleep(3);
     }
