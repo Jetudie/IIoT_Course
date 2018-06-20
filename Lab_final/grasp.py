@@ -1,4 +1,3 @@
-
 import RPi.GPIO as GPIO
 import random
 import time
@@ -11,32 +10,49 @@ def initEnv():
 def initPin(pins):
     for ledPin in pins:
         GPIO.setup(ledPin, GPIO.OUT)
+def initSwitch(pin):
+    GPIO.setup(pin, GPIO.OUT)
+    GPIO.output(pin, False)
 
-def setupPin(ledPin):
-    #for ledPin in pins:
+def setupPins(pins):
+    for ledPin in pins:
         GPIO.output(ledPin, True)
 
+def setupPin(pin):
+    GPIO.output(pin, True)
+
 def setoffPin(ledPin):
-    #for ledPin in pins:
-        GPIO.output(ledPin, False)
+    GPIO.output(ledPin, False)
+
 def main():
     P = [3,5,7]
+    Switch = 11
     initEnv()
     initPin(P)
+    initSwitch(Switch)
+
+    print(sys.argv[1])
     if int(sys.argv[1]) == 0:
-        setupPin([P[0],P[1]])
+        setupPins([P[0],P[1]])
         setoffPin(P[2])
-    elif int(sys.argv[1]) == 1:
-        setupPin([P[0],P[2]])
+    if int(sys.argv[1]) == 1:
+        setupPins([P[0],P[2]])
         setoffPin(P[1])
-    elif int(sys.argv[1]) == 2:
-        setupPin([P[1],P[2]])
+    if int(sys.argv[1]) == 2:
+        setupPins([P[1],P[2]])
         setoffPin(P[0])
 
-    time.sleep(5)
-    setoffPin(P)
+    setupPin(Switch)
+    time.sleep(1)
+    setoffPin(Switch)
+    time.sleep(2)
+    setupPins(P)
+    setupPin(Switch)
+
+    time.sleep(3)
+    setoffPin(Switch)
     
-    GPIO.cleanup()
+    #GPIO.cleanup()
 
 
 if __name__ == '__main__':
