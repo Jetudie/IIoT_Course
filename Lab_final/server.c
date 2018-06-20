@@ -43,23 +43,38 @@ static void *runDetection(void *server){
     pthread_mutex_unlock( &mutex1 ); 
 
     int i = 0;
+    int ret = 3;
+    char str[30] = "python3 grasp.py 0";
     UA_Server *s1 = (UA_Server*) server;
 
     sleep(3);
 
     while(running && threading){
 	    printf("Detecting... (%d)\n", ++i);
+	    writeStatusVariable(s1, 2); 
+	    system("python3 trytry.py; echo $?>log.txt");
+
+	    FILE *file = fopen("log.txt", "r");
+	    if(file == NULL){
+		printf("Fail to open file!\n");
+	    }
+
+	    /* set hum and temp according to log.txt */
+	    fscanf(file, "%d", &ret);
+	    fclose(file);
+	    printf("return value: %d\n", ret);
+
+	    str[17] += ret; 
+	    writeRGBVariable(s1, ret);
 	    writeStatusVariable(s1, 1); 
-	    sleep(3);
-	    system("python3 try2.py");
-	    writeRGBVariable(s1, 2);
-	    sleep(3);
+	    ret = system(str);
+	    sleep(2);
     }
 
     pthread_mutex_lock( &mutex1 ); 
     threading = 0;
     pthread_mutex_unlock( &mutex1 ); 
-
+    writeStatusVariable(s1, 0); 
     pthread_exit((void*) str);
 }
 
@@ -109,7 +124,7 @@ writeRGBVariable(UA_Server *server, int x) {
     UA_Int32 myInt;
     switch(x){
 	case 1:
-	    myIntegerNodeId = UA_NODEID_STRING(1, "red");
+	    myIntegerNodeId = UA_NODEID_STRING(1, "blue");
 	    myInt = ++Red; 
 	    break;
 	case 2:
@@ -117,11 +132,11 @@ writeRGBVariable(UA_Server *server, int x) {
 	    myInt = ++Green; 
 	    break;
 	case 3:
-	    myIntegerNodeId = UA_NODEID_STRING(1, "blue");
+	    myIntegerNodeId = UA_NODEID_STRING(1, "red");
 	    myInt = ++Blue; 
 	    break;
 	default:
-	    myIntegerNodeId = UA_NODEID_STRING(1, "red");
+	    myIntegerNodeId = UA_NODEID_STRING(1, "blue");
 	    myInt = ++Red; 
     }
 
@@ -306,7 +321,7 @@ int main(void) {
     UA_StatusCode retval = UA_Server_run(server, &running);
     pthread_join(t, &ret);
     char *result = (char*) ret;
-    printf("result = %s", result);
+    printf("result = %s\n", result);
     UA_Server_delete(server);
     UA_ServerConfig_delete(config);
     return (int)retval;
