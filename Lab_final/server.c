@@ -44,7 +44,7 @@ static void *runDetection(void *server){
 
     int i = 0;
     int ret = 3;
-    char str[30] = "python3 grasp.py 0";
+    char str1[30] = "python3 grasp.py 0";
     UA_Server *s1 = (UA_Server*) server;
 
     sleep(3);
@@ -64,10 +64,11 @@ static void *runDetection(void *server){
 	    fclose(file);
 	    printf("return value: %d\n", ret);
 
-	    str[17] += ret; 
+	    str1[17] += ret; 
 	    writeRGBVariable(s1, ret);
 	    writeStatusVariable(s1, 1); 
-	    ret = system(str);
+	    ret = system(str1);
+	    str1[17] = '0'; 
 	    sleep(2);
     }
 
