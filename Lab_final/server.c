@@ -67,7 +67,7 @@ static void *runDetection(void *server){
 	    str1[17] += ret; 
 	    writeRGBVariable(s1, ret);
 	    writeStatusVariable(s1, 1); 
-	    ret = system(str1);
+	    system(str1);
 	    str1[17] = '0'; 
 	    sleep(2);
     }
@@ -124,15 +124,15 @@ writeRGBVariable(UA_Server *server, int x) {
     UA_NodeId myIntegerNodeId;
     UA_Int32 myInt;
     switch(x){
-	case 1:
+	case 0:
 	    myIntegerNodeId = UA_NODEID_STRING(1, "blue");
 	    myInt = ++Red; 
 	    break;
-	case 2:
+	case 1:
 	    myIntegerNodeId = UA_NODEID_STRING(1, "green");
 	    myInt = ++Green; 
 	    break;
-	case 3:
+	case 2:
 	    myIntegerNodeId = UA_NODEID_STRING(1, "red");
 	    myInt = ++Blue; 
 	    break;

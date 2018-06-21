@@ -4,7 +4,6 @@ from picamera import PiCamera
 import numpy as np
 import time
 import cv2
-import sys
 
 # initialize the camera and grab a reference to the raw camera capture
 camera = PiCamera()
@@ -15,8 +14,8 @@ rawCapture = PiRGBArray(camera, size=(640, 480))
 # allow the camera to warmup
 sensitivity = 20
 # load the image
-lower_BGR = [(120-sensitivity,50,50), (60-sensitivity,100,100),  (170,70,50)]#170
-upper_BGR = [(120+sensitivity,255,255), (60+sensitivity,255,255), (180,255,255)] #180
+lower_BGR = [(120-sensitivity,50,50), (60-sensitivity,100-20,100-20),  (0,70,50)]#170
+upper_BGR = [(120+sensitivity,255,255), (60+sensitivity,255,255), (10,255,255)] #180
 color = ["Blue", "Green", "Red", "None"]
 time.sleep(0.1)
 answer = 3
@@ -54,7 +53,9 @@ for frame in camera.capture_continuous(rawCapture, format="bgr", use_video_port=
     # if the `q` key was pressed, break from the loop
     if key == ord("q"):
         break
-    if answer != 3:
-        break
 
-sys.exit(answer)
+FILE = open("log.txt", "w")
+        
+FILE.write(answer+"\n")
+
+FILE.close()

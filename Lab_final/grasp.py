@@ -43,14 +43,9 @@ def main():
         setoffPin(P[0])
 
     setupPin(Switch)
-    time.sleep(1)
+    time.sleep(0.1)
     setoffPin(Switch)
-    time.sleep(2)
-    setupPins(P)
-    setupPin(Switch)
-
-    time.sleep(3)
-    setoffPin(Switch)
+    time.sleep(3.5)
     
     #GPIO.cleanup()
 
