@@ -52,7 +52,7 @@ static void *runDetection(void *server){
     while(running && threading){
 	    printf("Detecting... (%d)\n", ++i);
 	    writeStatusVariable(s1, 2); 
-	    system("python3 trytry.py; echo $?>log.txt");
+	    system("python3 detectcolor.py; echo $?>log.txt");
 
 	    FILE *file = fopen("log.txt", "r");
 	    if(file == NULL){
