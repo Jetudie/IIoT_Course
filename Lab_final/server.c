@@ -310,19 +310,13 @@ int main(void) {
     signal(SIGINT, stopHandler);
     signal(SIGTERM, stopHandler);
 
-    void *ret;
-
     UA_ServerConfig *config = UA_ServerConfig_new_default();
     UA_Server *server = UA_Server_new(config);
 
     /* Add obejcts with methods and variables underneath */
     addARMObject(server, "ARM");
 
-    pthread_create(&t, NULL, runDetection, (void*) server);
     UA_StatusCode retval = UA_Server_run(server, &running);
-    pthread_join(t, &ret);
-    char *result = (char*) ret;
-    printf("result = %s\n", result);
     UA_Server_delete(server);
     UA_ServerConfig_delete(config);
     return (int)retval;
