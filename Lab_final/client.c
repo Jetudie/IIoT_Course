@@ -23,12 +23,8 @@ static void handler_TheAnswerChanged(UA_Client *client, const UA_UInt32 monId, c
 	const UA_NodeId nodeId2 = UA_NODEID_STRING(1, context);
 	retval = UA_Client_readValueAttribute(client, nodeId2, &value1);
 	if(retval == UA_STATUSCODE_GOOD){
-		UA_Double str = *(UA_Double*)value1.data;
-		printf("%s changed to %.2f", context, str);
-		if(*(char*)context == 't')
-			printf("*C\n");
-		if(*(char*)context == 'h')
-			printf("%\n");
+		UA_Int32 object_num = *(UA_Int32*)value1.data;
+		printf("%s: %d", context, object_num);
 	}
 
 }
@@ -46,8 +42,9 @@ int main(void) {
 
 	/* create new client */
     	UA_Client *client = UA_Client_new(UA_ClientConfig_default);
+    	//UA_StatusCode retval = UA_Client_connect(client, "opc.tcp://192.168.43.193");
     	UA_StatusCode retval = UA_Client_connect(client, "opc.tcp://localhost:4840");
-    	//UA_StatusCode retval = UA_Client_connect(client, "opc.tcp://192.168.1.110:4840", "user1", "user1passwd")
+
 
     	if(retval != UA_STATUSCODE_GOOD) {
         	UA_Client_delete(client);
@@ -62,24 +59,30 @@ int main(void) {
 	/* Subscription */
 	UA_UInt32 subId1 = 0;
 	UA_UInt32 subId2 = 0;
+	UA_UInt32 subId3 = 0;
 	UA_Client_Subscriptions_new(client, UA_SubscriptionSettings_default, &subId1);
 	UA_Client_Subscriptions_new(client, UA_SubscriptionSettings_default, &subId2);
+	UA_Client_Subscriptions_new(client, UA_SubscriptionSettings_default, &subId3);
 
 	if(subId1 && subId2){
 		printf("Create subscription suceeded, id %u\n", subId1);
 		printf("Create subscription suceeded, id %u\n", subId2);
+		printf("Create subscription suceeded, id %u\n", subId3);
 	}
 
-	char hfContext[2][7] = {"temp", "hum"};
-	UA_NodeId monitorThis[2] = {UA_NODEID_STRING(1, "temp"), UA_NODEID_STRING(1, "hum")};
+	char hfContext[3][7] = {"blue", "green", "red"};
+	UA_NodeId monitorThis[3] = {UA_NODEID_STRING(1, "blue"), UA_NODEID_STRING(1, "green"), UA_NODEID_STRING(1, "red")};
 	UA_UInt32 monId1 = 0;
 	UA_UInt32 monId2 = 0;
+	UA_UInt32 monId3 = 0;
 	UA_Client_Subscriptions_addMonitoredItem(client, subId1, monitorThis[0], UA_ATTRIBUTEID_VALUE, handler_TheAnswerChanged, hfContext[0], &monId1, 0.3);
 	UA_Client_Subscriptions_addMonitoredItem(client, subId2, monitorThis[1], UA_ATTRIBUTEID_VALUE, handler_TheAnswerChanged, hfContext[1], &monId2, 0.3);
+	UA_Client_Subscriptions_addMonitoredItem(client, subId3, monitorThis[2], UA_ATTRIBUTEID_VALUE, handler_TheAnswerChanged, hfContext[2], &monId2, 0.3);
 
-	if(monId1 && monId2){
+	if(monId1 && monId2 && monId3){
 		printf("Monitoring 'Temp' and 'Hum', id %u\n", monId1);
 		printf("Monitoring 'Temp' and 'Hum', id %u\n", monId2);
+		printf("Monitoring 'Temp' and 'Hum', id %u\n", monId3);
 	}
 
 	while(running){
