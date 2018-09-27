@@ -1,0 +1,111 @@
+#include <Braccio.h>
+#include <Servo.h>
+
+Servo base;
+Servo shoulder;
+Servo elbow;
+Servo wrist_rot;
+Servo wrist_ver;
+Servo gripper;
+
+int states = 0, A, B, C, D;
+
+unsigned long startTime;
+unsigned long duration;
+
+void setup() 
+{
+  Serial.begin(9600);
+  pinMode(4,INPUT);     //right(¥k)
+  pinMode(7,INPUT);     //mid(¤¤)
+  pinMode(8,INPUT);     //left(¥ª)
+  pinMode(13,INPUT);
+  Braccio.begin();
+}
+void loop() 
+{
+  mainpro();
+  duration = (millis() - startTime) / 1000;
+  Serial.println(duration);
+}
+void Bracciolright()
+{
+ //Braccio.ServoMovement(20, 180, 90, 165, 165, 99,  10);
+   Braccio.ServoMovement(20, 180, 80, 165, 165, 99,  10);
+   Braccio.ServoMovement(20, 180, 80, 165, 165, 99,  73);
+   Braccio.ServoMovement(20, 180, 35, 165, 165, 99,  73);
+   Braccio.ServoMovement(20, 145, 35, 165, 165, 99,  73);
+   Braccio.ServoMovement(20, 145, 80, 165, 165, 99,  73);
+   Braccio.ServoMovement(20, 145, 80, 165, 165, 99,  10); 
+   Braccio.ServoMovement(20, 145, 35, 165, 165, 99,  10);
+   Braccio.ServoMovement(20, 180, 35, 165, 165, 99,  10);             
+   states = states;
+}
+
+void Bracciolmid()
+{
+ //Braccio.ServoMovement(20, 180, 90, 165, 165, 99,  10);
+   Braccio.ServoMovement(20, 180, 80, 165, 165, 99,  10);   
+   Braccio.ServoMovement(20, 180, 80, 165, 165, 99,  73); 
+   Braccio.ServoMovement(20, 180, 35, 165, 165, 99,  73);
+   Braccio.ServoMovement(20, 110, 35, 165, 165, 99,  73);
+   Braccio.ServoMovement(20, 110, 80, 165, 165, 99,  73);
+   Braccio.ServoMovement(20, 110, 80, 165, 165, 99,  10);
+   Braccio.ServoMovement(20, 110, 35, 165, 165, 99,  10);
+   Braccio.ServoMovement(20, 180, 35, 165, 165, 99,  10);//  
+   states = states + 1;   
+}
+
+void Bracciolleft()
+{
+ //Braccio.ServoMovement(20, 180, 90, 165, 165, 99,  10);
+   Braccio.ServoMovement(20, 180, 80, 165, 165, 99,  10);
+   Braccio.ServoMovement(20, 180, 80, 165, 165, 99,  73);  
+   Braccio.ServoMovement(20, 180, 35, 165, 165, 99,  73);
+   Braccio.ServoMovement(20, 80, 35, 165, 165, 99,  73);
+   Braccio.ServoMovement(20, 80, 80, 165, 165, 99,  73);
+   Braccio.ServoMovement(20, 80, 80, 165, 165, 99,  10);
+   Braccio.ServoMovement(20, 80, 35, 165, 165, 99,  10);
+   Braccio.ServoMovement(20, 180, 35, 165, 165, 99,  10);                    
+   states = states + 2;     
+}
+void Bracciolstop()
+{
+   Braccio.ServoMovement(20, 180, 45, 165, 165, 99,  10); 
+}
+void mainpro()
+{
+  startTime = millis();
+  A = digitalRead(8);
+  B = digitalRead(7);  
+  C = digitalRead(4);
+  D = digitalRead(13);
+
+  Serial.print("A=");
+  Serial.print(A);
+  Serial.print("B=");
+  Serial.print(B);
+  Serial.print("C=");
+  Serial.print(C);
+  Serial.print("D=");
+  Serial.println(D);  
+  if(D == HIGH)
+  {
+      if((A == HIGH) && (B == HIGH) && (C == HIGH)) //111
+      {
+        Bracciolstop();
+      }else if((A == HIGH) && (B == HIGH) && (C == LOW))  //110(¥k)
+      {
+        Bracciolright();
+      }else if((A == HIGH) && (B == LOW) && (C == HIGH))   //101(¤¤)
+      {
+        Bracciolmid();
+      }else if((A == LOW) && (B == HIGH) && (C == HIGH))    //011(¥ª)
+      {
+        Bracciolleft();
+      }else
+      {
+        Bracciolstop();    
+      }
+  }else{Bracciolstop();}
+}
